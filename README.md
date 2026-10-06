@@ -3,6 +3,8 @@
 Production-grade, multi-environment (**dev / qa / prod**) AWS infrastructure with Terraform,
 GitHub Actions CI/CD, and security controls at every layer.
 
+> **Docs:** [Runbook (every step)](docs/RUNBOOK.md) · [Human access](docs/HUMAN_ACCESS.md) · [Interview guide](docs/INTERVIEW_NOTES.md)
+
 ```
                      Internet
                         │
@@ -47,7 +49,7 @@ GitHub Actions CI/CD, and security controls at every layer.
 │   ├── dependabot.yml
 │   └── pull_request_template.md
 ├── .checkov.yaml  .tflint.hcl  .pre-commit-config.yaml  .terraform-version  Makefile
-└── docs/INTERVIEW_NOTES.md   # Design decisions & Q&A for interviews
+└── docs/                     # RUNBOOK (all steps), HUMAN_ACCESS, INTERVIEW_NOTES (pitch, issues & fixes, Q&A)
 ```
 
 ### Why directories per environment (not workspaces)?
