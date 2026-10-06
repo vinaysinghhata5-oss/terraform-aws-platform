@@ -1,0 +1,6 @@
+# Every change needs owner review. In an organisation, map paths to teams, e.g.
+# /envs/prod/ @org/platform-team @org/security-team
+*            @vinaysinghhata5-oss
+/envs/prod/  @vinaysinghhata5-oss
+/bootstrap/  @vinaysinghhata5-oss
+/.github/    @vinaysinghhata5-oss

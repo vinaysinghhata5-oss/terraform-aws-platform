@@ -1,0 +1,90 @@
+# Nightly drift detection: opens / updates an issue when real infra != code.
+name: terraform-drift
+
+on:
+  schedule:
+    - cron: "0 2 * * 1-5" # 02:00 UTC, weekdays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.16.5"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  drift:
+    name: drift (${{ matrix.environment }})
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: dev
+            account_var: DEV_AWS_ACCOUNT_ID
+          - environment: qa
+            account_var: QA_AWS_ACCOUNT_ID
+          - environment: prod
+            account_var: PROD_AWS_ACCOUNT_ID
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    defaults:
+      run:
+        working-directory: envs/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars[matrix.account_var] }}:role/gha-terraform-plan-${{ matrix.environment }}
+          role-session-name: gha-drift-${{ matrix.environment }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - run: terraform init -lockfile=readonly
+
+      - name: Detect drift
+        id: drift
+        run: |
+          set +e
+          terraform plan -lock=false -no-color -detailed-exitcode > plan.txt 2>&1
+          code=$?
+          set -e
+          cat plan.txt
+          [ "$code" -eq 1 ] && exit 1
+          echo "drifted=$([ "$code" -eq 2 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update drift issue
+        if: steps.drift.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          title="Terraform drift detected in ${ENVIRONMENT}"
+          {
+            echo "Drift detected by run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo '```hcl'
+            tail -c 60000 plan.txt
+            echo '```'
+          } > body.md
+          gh label create drift --color B60205 --description "Terraform drift" 2>/dev/null || true
+          existing=$(gh issue list --state open --label drift --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+          else
+            gh issue create --title "$title" --label drift --body-file body.md
+          fi

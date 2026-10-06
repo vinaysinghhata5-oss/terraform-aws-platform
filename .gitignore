@@ -1,0 +1,30 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+tfplan.enc
+plan.txt
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Never commit secrets
+*.pem
+*.key
+.env
+*.auto.tfvars
+secrets.tfvars
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# NOTE: .terraform.lock.hcl IS committed (provider supply-chain pinning).

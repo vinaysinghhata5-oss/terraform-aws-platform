@@ -1,0 +1,14 @@
+# Repo-wide Checkov config. Prefer inline `#checkov:skip=ID:reason` on the specific
+# resource; only checks that are a conscious design decision for ALL buckets live here.
+compact: true
+quiet: true
+framework:
+  - terraform
+  - github_actions
+download-external-modules: false
+skip-path:
+  - .terraform
+skip-check:
+  - CKV_AWS_144  # S3 cross-region replication - DR for state handled by versioning + backups
+  - CKV_AWS_18   # S3 server access logging - CloudTrail data events used instead
+  - CKV2_AWS_62  # S3 event notifications - not required

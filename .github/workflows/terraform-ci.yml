@@ -1,0 +1,176 @@
+# Runs on every PR: lint + security scan + read-only plan for every environment.
+name: terraform-ci
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "envs/**"
+      - "modules/**"
+      - "templates/**"
+      - ".github/workflows/**"
+      - ".tflint.hcl"
+      - ".checkov.yaml"
+
+# Least privilege by default; jobs opt in to what they need.
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.16.5"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  static-checks:
+    name: fmt / validate / tflint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: terraform validate (all roots)
+        run: |
+          for dir in envs/dev envs/qa envs/prod bootstrap; do
+            echo "::group::validate $dir"
+            terraform -chdir="$dir" init -backend=false -lockfile=readonly
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
+
+  security-scan:
+    name: checkov (IaC security)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to the Security tab
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          config_file: .checkov.yaml
+          output_format: cli,sarif
+          output_file_path: console,results.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: checkov
+
+  plan:
+    name: plan (${{ matrix.environment }})
+    needs: [static-checks, security-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Fork PRs never receive an OIDC token, so they cannot reach AWS.
+    if: github.event.pull_request.head.repo.full_name == github.repository && vars.DEPLOY_ENABLED == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: dev
+            account_var: DEV_AWS_ACCOUNT_ID
+          - environment: qa
+            account_var: QA_AWS_ACCOUNT_ID
+          - environment: prod
+            account_var: PROD_AWS_ACCOUNT_ID
+    permissions:
+      contents: read
+      id-token: write # OIDC -> AWS STS
+      pull-requests: write # plan comment
+    defaults:
+      run:
+        working-directory: envs/${{ matrix.environment }}
+    steps:
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars[matrix.account_var] }}:role/gha-terraform-plan-${{ matrix.environment }}
+          role-session-name: gha-plan-${{ matrix.environment }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: terraform init -lockfile=readonly
+
+      - name: terraform plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -lock-timeout=5m -no-color -detailed-exitcode -out=tfplan > plan.txt 2>&1
+          code=$?
+          set -e
+          cat plan.txt
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          # 0 = no changes, 2 = changes, 1 = error
+          [ "$code" -eq 1 ] && exit 1 || exit 0
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+          EXITCODE: ${{ steps.plan.outputs.exitcode }}
+        with:
+          script: |
+            const fs = require('fs');
+            const env = process.env.ENVIRONMENT;
+            const marker = `<!-- tf-plan-${env} -->`;
+            let plan = fs.readFileSync(`envs/${env}/plan.txt`, 'utf8');
+            const max = 60000;
+            if (plan.length > max) plan = '...truncated...\n' + plan.slice(-max);
+            const status = process.env.EXITCODE === '2' ? 'changes' : 'no changes';
+            const body = `${marker}\n### Terraform plan: \`${env}\` (${status})\n<details><summary>Show plan</summary>\n\n\`\`\`hcl\n${plan}\n\`\`\`\n</details>\n\n_Commit ${context.sha.substring(0, 7)}, run #${context.runNumber}_`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: context.issue.number, per_page: 100,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }

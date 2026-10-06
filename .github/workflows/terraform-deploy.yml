@@ -1,0 +1,50 @@
+# On merge to main: promote dev -> qa -> prod. Each stage reuses the same
+# workflow; qa and prod are gated by GitHub Environment required reviewers.
+name: terraform-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "envs/**"
+      - "modules/**"
+      - "templates/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Set repo variable DEPLOY_ENABLED=true once AWS accounts are bootstrapped.
+  dev:
+    if: vars.DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      environment: dev
+      aws_account_id: ${{ vars.DEV_AWS_ACCOUNT_ID }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  qa:
+    needs: dev
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      environment: qa
+      aws_account_id: ${{ vars.QA_AWS_ACCOUNT_ID }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  prod:
+    needs: qa
+    uses: ./.github/workflows/_terraform-apply.yml
+    with:
+      environment: prod
+      aws_account_id: ${{ vars.PROD_AWS_ACCOUNT_ID }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
