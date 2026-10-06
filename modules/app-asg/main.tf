@@ -90,6 +90,15 @@ resource "aws_iam_instance_profile" "this" {
   tags        = var.tags
 }
 
+# Provider default_tags are NOT applied inside launch-template tag_specifications,
+# so read them explicitly; otherwise instances/volumes miss cost-allocation tags
+# (and an empty tag map is rejected by EC2).
+data "aws_default_tags" "current" {}
+
+locals {
+  launch_tags = merge(data.aws_default_tags.current.tags, var.tags)
+}
+
 # ---------- Launch template ----------
 resource "aws_launch_template" "this" {
   name_prefix   = "${var.name}-app-"
@@ -128,12 +137,12 @@ resource "aws_launch_template" "this" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = merge(var.tags, { Name = "${var.name}-app" })
+    tags          = merge(local.launch_tags, { Name = "${var.name}-app" })
   }
 
   tag_specifications {
     resource_type = "volume"
-    tags          = var.tags
+    tags          = merge(local.launch_tags, { Name = "${var.name}-app" })
   }
 
   tags = var.tags

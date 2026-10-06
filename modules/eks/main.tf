@@ -348,6 +348,15 @@ resource "aws_iam_role_policy_attachment" "node" {
   policy_arn = "arn:${local.partition}:iam::aws:policy/${each.value}"
 }
 
+# Provider default_tags are NOT applied inside launch-template tag_specifications,
+# so read them explicitly; otherwise instances/volumes miss cost-allocation tags
+# (and an empty tag map is rejected by EC2).
+data "aws_default_tags" "current" {}
+
+locals {
+  launch_tags = merge(data.aws_default_tags.current.tags, var.tags)
+}
+
 resource "aws_launch_template" "node" {
   for_each = var.node_groups
 
@@ -378,12 +387,12 @@ resource "aws_launch_template" "node" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = merge(var.tags, { Name = "${var.name}-${each.key}" })
+    tags          = merge(local.launch_tags, { Name = "${var.name}-${each.key}" })
   }
 
   tag_specifications {
     resource_type = "volume"
-    tags          = var.tags
+    tags          = merge(local.launch_tags, { Name = "${var.name}-${each.key}" })
   }
 
   tags = var.tags
