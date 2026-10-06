@@ -3,13 +3,12 @@
 # A stage is skipped when DEPLOY_ENABLED != true or its account variable is empty.
 name: terraform-deploy
 
+# Every merge to main deploys: main must always equal what is running.
+# (A path filter would skip deploys when e.g. scripts/ or the workflows change.)
+# The apply job still only runs when the plan actually has changes.
 on:
   push:
     branches: [main]
-    paths:
-      - "envs/**"
-      - "modules/**"
-      - "templates/**"
   workflow_dispatch:
 
 permissions:
