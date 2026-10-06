@@ -78,11 +78,16 @@ jobs:
           cat plan.txt
           [ "$code" -eq 1 ] && exit 1
           echo "has_changes=$([ "$code" -eq 2 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # Approvers see this table on the run page before approving the apply.
           {
-            echo "## Plan for \`${{ inputs.environment }}\`"
+            ../../scripts/plan-summary.sh "${{ inputs.environment }}" tfplan
+            echo
+            echo "<details><summary>Full plan output</summary>"
+            echo
             echo '```hcl'
-            tail -c 60000 plan.txt
+            tail -c 55000 plan.txt
             echo '```'
+            echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Plan files can contain sensitive values - encrypt before it becomes an artifact.
@@ -155,4 +160,9 @@ jobs:
       # Applying the saved plan guarantees we deploy exactly what was reviewed.
       # If state changed since the plan, Terraform refuses ("saved plan is stale").
       - name: terraform apply
-        run: terraform apply -lock-timeout=5m -no-color tfplan
+        run: |
+          terraform apply -lock-timeout=5m -no-color tfplan | tee apply.txt
+          {
+            echo "### \`${{ inputs.environment }}\` applied ✅"
+            grep -E '^Apply complete!' apply.txt || true
+          } >> "$GITHUB_STEP_SUMMARY"
