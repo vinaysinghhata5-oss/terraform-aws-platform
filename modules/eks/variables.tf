@@ -132,3 +132,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "endpoint_private_access_security_group_ids" {
+  description = "Security groups (e.g. bastion) allowed to reach the private API endpoint."
+  type        = list(string)
+  default     = []
+}

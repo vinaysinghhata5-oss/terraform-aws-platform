@@ -1,0 +1,27 @@
+#!/bin/bash
+# Installs EKS tooling and pre-configures kubeconfig for anyone who logs in.
+set -euxo pipefail
+
+# kubectl - latest patch of the cluster's minor version (client within +/-1 minor of server)
+KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable-${kubernetes_version}.txt")
+curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+curl -fsSLo /tmp/kubectl.sha256 "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+echo "$(cat /tmp/kubectl.sha256)  /usr/local/bin/kubectl" | sha256sum --check
+chmod 0755 /usr/local/bin/kubectl
+
+# helm
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+dnf install -y git jq bash-completion
+
+# Any login shell (ec2-user, ssm-user) gets a ready kubeconfig + completion.
+cat > /etc/profile.d/eks.sh <<'PROFILE'
+export AWS_REGION=${region}
+if [ ! -f "$HOME/.kube/config" ]; then
+  aws eks update-kubeconfig --name ${cluster_name} --region ${region} >/dev/null 2>&1 || true
+fi
+source <(kubectl completion bash)
+alias k=kubectl
+complete -o default -F __start_kubectl k
+PROFILE
+chmod 0644 /etc/profile.d/eks.sh

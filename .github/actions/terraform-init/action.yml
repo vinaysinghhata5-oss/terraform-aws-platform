@@ -1,0 +1,50 @@
+name: terraform-init
+description: Install Terraform, inject account-specific variables and init the env's S3 backend.
+inputs:
+  environment:
+    description: dev | qa | prod
+    required: true
+  aws_account_id:
+    description: Target AWS account ID
+    required: true
+  aws_region:
+    description: AWS region
+    required: true
+  eks_admin_principal_arns:
+    description: JSON list of IAM ARNs granted EKS cluster-admin (optional)
+    required: false
+    default: ""
+  terraform_version:
+    description: Terraform version
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+        terraform_wrapper: false
+
+    - name: Export account-specific variables
+      shell: bash
+      env:
+        ACCOUNT_ID: ${{ inputs.aws_account_id }}
+        REGION: ${{ inputs.aws_region }}
+        ADMINS: ${{ inputs.eks_admin_principal_arns }}
+      run: |
+        {
+          echo "TF_VAR_aws_account_id=$ACCOUNT_ID"
+          echo "TF_VAR_region=$REGION"
+          [ -n "$ADMINS" ] && echo "TF_VAR_eks_admin_principal_arns=$ADMINS"
+        } >> "$GITHUB_ENV"
+
+    - name: terraform init
+      shell: bash
+      working-directory: envs/${{ inputs.environment }}
+      env:
+        ACCOUNT_ID: ${{ inputs.aws_account_id }}
+        REGION: ${{ inputs.aws_region }}
+      run: |
+        terraform init -input=false -lockfile=readonly \
+          -backend-config="bucket=acme-tfstate-${ACCOUNT_ID}-${REGION}" \
+          -backend-config="region=${REGION}"

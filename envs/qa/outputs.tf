@@ -1,21 +1,6 @@
-output "alb_dns_name" {
-  description = "Public endpoint of the application."
-  value       = module.alb.alb_dns_name
-}
-
 output "vpc_id" {
   description = "VPC ID."
   value       = module.vpc.vpc_id
-}
-
-output "db_endpoint" {
-  description = "RDS endpoint."
-  value       = module.rds.endpoint
-}
-
-output "db_secret_arn" {
-  description = "Secrets Manager ARN for DB credentials (value is never exposed)."
-  value       = module.rds.master_user_secret_arn
 }
 
 output "app_bucket" {
@@ -34,6 +19,31 @@ output "eks_cluster_endpoint" {
 }
 
 output "kubeconfig_command" {
-  description = "Command to configure kubectl."
+  description = "Command to configure kubectl (run on the bastion or over VPN)."
   value       = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.region}"
+}
+
+output "bastion_instance_id" {
+  description = "Bastion instance ID."
+  value       = var.enable_bastion ? module.bastion[0].instance_id : null
+}
+
+output "bastion_connect_command" {
+  description = "Open a shell on the bastion via SSM Session Manager."
+  value       = var.enable_bastion ? "aws ssm start-session --target ${module.bastion[0].instance_id} --region ${var.region}" : null
+}
+
+output "alb_dns_name" {
+  description = "Public endpoint of the application (app tier only)."
+  value       = var.enable_app_tier ? module.alb[0].alb_dns_name : null
+}
+
+output "db_endpoint" {
+  description = "RDS endpoint (app tier only)."
+  value       = var.enable_app_tier ? module.rds[0].endpoint : null
+}
+
+output "db_secret_arn" {
+  description = "Secrets Manager ARN for DB credentials (app tier only)."
+  value       = var.enable_app_tier ? module.rds[0].master_user_secret_arn : null
 }

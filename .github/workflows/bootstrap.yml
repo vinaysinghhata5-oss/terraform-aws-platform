@@ -1,0 +1,54 @@
+# ONE-TIME per account. Creates the state bucket, KMS key, GitHub OIDC provider,
+# plan/apply roles and budget alert. It is the only workflow that uses static keys
+# (chicken-and-egg: the OIDC roles don't exist yet). Delete the two
+# BOOTSTRAP_AWS_* secrets and deactivate the key once this has succeeded.
+name: bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Account to bootstrap
+        type: choice
+        options: [dev, qa, prod]
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.16.5"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  bootstrap:
+    name: bootstrap (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: bootstrap-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.BOOTSTRAP_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.BOOTSTRAP_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Bootstrap
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          BUDGET_EMAIL: ${{ secrets.BUDGET_EMAIL }}
+        run: ./scripts/bootstrap.sh "$ENVIRONMENT"

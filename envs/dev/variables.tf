@@ -179,3 +179,21 @@ variable "eks_node_groups" {
     })), [])
   }))
 }
+
+variable "enable_app_tier" {
+  description = "Create the classic ALB -> EC2 ASG -> RDS tier."
+  type        = bool
+  default     = true
+}
+
+variable "enable_bastion" {
+  description = "Create an SSM-only bastion with kubectl/helm and EKS admin access."
+  type        = bool
+  default     = true
+}
+
+variable "bastion_instance_type" {
+  description = "Bastion instance type."
+  type        = string
+  default     = "t3.micro"
+}

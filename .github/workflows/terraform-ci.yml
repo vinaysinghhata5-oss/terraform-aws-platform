@@ -1,4 +1,4 @@
-# Runs on every PR: lint + security scan + read-only plan for every environment.
+# Runs on every PR: lint + security scan + read-only plan for every configured environment.
 name: terraform-ci
 
 on:
@@ -8,7 +8,8 @@ on:
       - "envs/**"
       - "modules/**"
       - "templates/**"
-      - ".github/workflows/**"
+      - "bootstrap/**"
+      - ".github/**"
       - ".tflint.hcl"
       - ".checkov.yaml"
 
@@ -90,23 +91,23 @@ jobs:
           sarif_file: results.sarif
           category: checkov
 
+  discover:
+    name: discover environments
+    uses: ./.github/workflows/_discover-envs.yml
+
   plan:
     name: plan (${{ matrix.environment }})
-    needs: [static-checks, security-scan]
+    needs: [static-checks, security-scan, discover]
+    # Fork PRs never receive an OIDC token, so they cannot reach AWS.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.discover.outputs.envs != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Fork PRs never receive an OIDC token, so they cannot reach AWS.
-    if: github.event.pull_request.head.repo.full_name == github.repository && vars.DEPLOY_ENABLED == 'true'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - environment: dev
-            account_var: DEV_AWS_ACCOUNT_ID
-          - environment: qa
-            account_var: QA_AWS_ACCOUNT_ID
-          - environment: prod
-            account_var: PROD_AWS_ACCOUNT_ID
+        include: ${{ fromJSON(needs.discover.outputs.envs) }}
     permissions:
       contents: read
       id-token: write # OIDC -> AWS STS
@@ -130,13 +131,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           mask-aws-account-id: true
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: ./.github/actions/terraform-init
         with:
+          environment: ${{ matrix.environment }}
+          aws_account_id: ${{ vars[matrix.account_var] }}
+          aws_region: ${{ vars.AWS_REGION }}
+          eks_admin_principal_arns: ${{ vars[matrix.admins_var] }}
           terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - name: terraform init
-        run: terraform init -lockfile=readonly
 
       - name: terraform plan
         id: plan

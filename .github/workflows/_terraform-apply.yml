@@ -11,6 +11,10 @@ on:
       aws_account_id:
         required: true
         type: string
+      eks_admin_principal_arns:
+        required: false
+        type: string
+        default: ""
     secrets:
       TF_PLAN_ENCRYPTION_KEY:
         required: true
@@ -56,12 +60,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           mask-aws-account-id: true
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: ./.github/actions/terraform-init
         with:
+          environment: ${{ inputs.environment }}
+          aws_account_id: ${{ inputs.aws_account_id }}
+          aws_region: ${{ vars.AWS_REGION }}
+          eks_admin_principal_arns: ${{ inputs.eks_admin_principal_arns }}
           terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - run: terraform init -lockfile=readonly
 
       - name: terraform plan
         id: plan
@@ -129,12 +134,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           mask-aws-account-id: true
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: ./.github/actions/terraform-init
         with:
+          environment: ${{ inputs.environment }}
+          aws_account_id: ${{ inputs.aws_account_id }}
+          aws_region: ${{ vars.AWS_REGION }}
+          eks_admin_principal_arns: ${{ inputs.eks_admin_principal_arns }}
           terraform_version: ${{ env.TF_VERSION }}
-          terraform_wrapper: false
-
-      - run: terraform init -lockfile=readonly
 
       - uses: actions/download-artifact@v4
         with:

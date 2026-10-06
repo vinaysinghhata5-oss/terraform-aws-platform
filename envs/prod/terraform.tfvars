@@ -60,3 +60,7 @@ eks_node_groups = {
     labels         = { "workload-type" = "general" }
   }
 }
+
+# Feature toggles
+enable_app_tier = true
+enable_bastion  = true

@@ -120,12 +120,13 @@ resource "aws_db_instance" "this" {
   tags = var.tags
 }
 
+# count, not for_each: SG IDs are unknown until apply, but the list length is known.
 resource "aws_vpc_security_group_ingress_rule" "additional" {
-  for_each = toset(var.additional_ingress_security_group_ids)
+  count = length(var.additional_ingress_security_group_ids)
 
   security_group_id            = aws_security_group.db.id
-  description                  = "PostgreSQL from ${each.value}"
-  referenced_security_group_id = each.value
+  description                  = "PostgreSQL from additional security group ${count.index}"
+  referenced_security_group_id = var.additional_ingress_security_group_ids[count.index]
   from_port                    = 5432
   to_port                      = 5432
   ip_protocol                  = "tcp"

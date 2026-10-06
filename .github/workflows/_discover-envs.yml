@@ -1,0 +1,36 @@
+# Reusable: list environments that are switched on (DEPLOY_ENABLED) and have an
+# AWS account configured, so dev-only setups don't fail on qa/prod.
+name: _discover-envs
+
+on:
+  workflow_call:
+    outputs:
+      envs:
+        description: JSON list of {environment, account_var, admins_var}
+        value: ${{ jobs.discover.outputs.envs }}
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      envs: ${{ steps.set.outputs.envs }}
+    steps:
+      - id: set
+        env:
+          ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          DEV: ${{ vars.DEV_AWS_ACCOUNT_ID }}
+          QA: ${{ vars.QA_AWS_ACCOUNT_ID }}
+          PROD: ${{ vars.PROD_AWS_ACCOUNT_ID }}
+        run: |
+          if [ "$ENABLED" != "true" ]; then echo "envs=[]" >> "$GITHUB_OUTPUT"; exit 0; fi
+          envs=$(jq -nc --arg dev "$DEV" --arg qa "$QA" --arg prod "$PROD" '
+            [ {environment:"dev",  account:$dev,  account_var:"DEV_AWS_ACCOUNT_ID",  admins_var:"DEV_EKS_ADMIN_PRINCIPAL_ARNS"},
+              {environment:"qa",   account:$qa,   account_var:"QA_AWS_ACCOUNT_ID",   admins_var:"QA_EKS_ADMIN_PRINCIPAL_ARNS"},
+              {environment:"prod", account:$prod, account_var:"PROD_AWS_ACCOUNT_ID", admins_var:"PROD_EKS_ADMIN_PRINCIPAL_ARNS"} ]
+            | map(select(.account != "")) | map(del(.account))')
+          echo "Enabled environments: $envs"
+          echo "envs=$envs" >> "$GITHUB_OUTPUT"

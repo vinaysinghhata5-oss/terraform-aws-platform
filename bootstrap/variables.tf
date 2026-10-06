@@ -34,3 +34,16 @@ variable "github_repo" {
   description = "GitHub repository name."
   type        = string
 }
+
+variable "budget_email" {
+  description = "Email for monthly cost alerts. null disables the budget."
+  type        = string
+  default     = null
+  sensitive   = true # keep it out of public CI logs
+}
+
+variable "budget_limit_usd" {
+  description = "Monthly budget in USD; alerts at 50%, 80% and 100% (forecast)."
+  type        = number
+  default     = 20
+}

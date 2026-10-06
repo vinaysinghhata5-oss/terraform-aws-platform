@@ -74,6 +74,17 @@ resource "aws_vpc_security_group_ingress_rule" "api_private" {
   ip_protocol       = "tcp"
 }
 
+resource "aws_vpc_security_group_ingress_rule" "api_from_sg" {
+  count = length(var.endpoint_private_access_security_group_ids)
+
+  security_group_id            = aws_security_group.cluster_additional.id
+  description                  = "Kubernetes API from trusted security group ${count.index} (e.g. bastion)"
+  referenced_security_group_id = var.endpoint_private_access_security_group_ids[count.index]
+  from_port                    = 443
+  to_port                      = 443
+  ip_protocol                  = "tcp"
+}
+
 # ======================= Cluster =======================
 resource "aws_eks_cluster" "this" {
   #checkov:skip=CKV_AWS_39:Public endpoint is per-env (false in prod); when on it is CIDR-restricted and 0.0.0.0/0 is rejected by validation
@@ -133,10 +144,12 @@ resource "aws_eks_cluster" "this" {
 }
 
 # ======================= Access entries (RBAC via IAM) =======================
+# Keys are static ("admin-0", ...) so ARNs of roles created in the same apply
+# (e.g. the bastion) can be used without "for_each value unknown" errors.
 locals {
   access_entries = merge(
-    { for arn in var.admin_principal_arns : arn => "AmazonEKSClusterAdminPolicy" },
-    { for arn in var.readonly_principal_arns : arn => "AmazonEKSViewPolicy" },
+    { for i, arn in var.admin_principal_arns : "admin-${i}" => { arn = arn, policy = "AmazonEKSClusterAdminPolicy" } },
+    { for i, arn in var.readonly_principal_arns : "readonly-${i}" => { arn = arn, policy = "AmazonEKSViewPolicy" } },
   )
 }
 
@@ -144,7 +157,7 @@ resource "aws_eks_access_entry" "this" {
   for_each = local.access_entries
 
   cluster_name  = aws_eks_cluster.this.name
-  principal_arn = each.key
+  principal_arn = each.value.arn
   type          = "STANDARD"
   tags          = var.tags
 }
@@ -154,7 +167,7 @@ resource "aws_eks_access_policy_association" "this" {
 
   cluster_name  = aws_eks_cluster.this.name
   principal_arn = aws_eks_access_entry.this[each.key].principal_arn
-  policy_arn    = "arn:${local.partition}:eks::aws:cluster-access-policy/${each.value}"
+  policy_arn    = "arn:${local.partition}:eks::aws:cluster-access-policy/${each.value.policy}"
 
   access_scope {
     type = "cluster"

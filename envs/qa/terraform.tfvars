@@ -46,3 +46,7 @@ eks_node_groups = {
     desired_size   = 2
   }
 }
+
+# Feature toggles
+enable_app_tier = true
+enable_bastion  = true

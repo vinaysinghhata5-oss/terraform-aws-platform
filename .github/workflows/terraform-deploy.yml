@@ -1,5 +1,6 @@
-# On merge to main: promote dev -> qa -> prod. Each stage reuses the same
-# workflow; qa and prod are gated by GitHub Environment required reviewers.
+# On merge to main (or manual run): promote dev -> qa -> prod. Each stage reuses the
+# same workflow; qa and prod are gated by GitHub Environment required reviewers.
+# A stage is skipped when DEPLOY_ENABLED != true or its account variable is empty.
 name: terraform-deploy
 
 on:
@@ -15,13 +16,13 @@ permissions:
   contents: read
 
 jobs:
-  # Set repo variable DEPLOY_ENABLED=true once AWS accounts are bootstrapped.
   dev:
-    if: vars.DEPLOY_ENABLED == 'true'
+    if: vars.DEPLOY_ENABLED == 'true' && vars.DEV_AWS_ACCOUNT_ID != ''
     uses: ./.github/workflows/_terraform-apply.yml
     with:
       environment: dev
       aws_account_id: ${{ vars.DEV_AWS_ACCOUNT_ID }}
+      eks_admin_principal_arns: ${{ vars.DEV_EKS_ADMIN_PRINCIPAL_ARNS }}
     secrets: inherit
     permissions:
       contents: read
@@ -29,10 +30,12 @@ jobs:
 
   qa:
     needs: dev
+    if: vars.DEPLOY_ENABLED == 'true' && vars.QA_AWS_ACCOUNT_ID != ''
     uses: ./.github/workflows/_terraform-apply.yml
     with:
       environment: qa
       aws_account_id: ${{ vars.QA_AWS_ACCOUNT_ID }}
+      eks_admin_principal_arns: ${{ vars.QA_EKS_ADMIN_PRINCIPAL_ARNS }}
     secrets: inherit
     permissions:
       contents: read
@@ -40,10 +43,12 @@ jobs:
 
   prod:
     needs: qa
+    if: vars.DEPLOY_ENABLED == 'true' && vars.PROD_AWS_ACCOUNT_ID != ''
     uses: ./.github/workflows/_terraform-apply.yml
     with:
       environment: prod
       aws_account_id: ${{ vars.PROD_AWS_ACCOUNT_ID }}
+      eks_admin_principal_arns: ${{ vars.PROD_EKS_ADMIN_PRINCIPAL_ARNS }}
     secrets: inherit
     permissions:
       contents: read

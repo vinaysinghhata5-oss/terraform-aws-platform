@@ -1,0 +1,78 @@
+# Manual teardown of one environment (e.g. dev after a practice session).
+# Requires typing the environment name to confirm, and runs inside the
+# environment gate so it uses the apply role (same approvals as deploy).
+name: terraform-destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to destroy
+        type: choice
+        options: [dev, qa]
+        required: true
+      confirm:
+        description: Type the environment name again to confirm
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.16.5"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  destroy:
+    name: destroy (${{ inputs.environment }})
+    if: inputs.confirm == inputs.environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: terraform-${{ inputs.environment }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: envs/${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve account
+        id: acct
+        env:
+          DEV: ${{ vars.DEV_AWS_ACCOUNT_ID }}
+          QA: ${{ vars.QA_AWS_ACCOUNT_ID }}
+          DEV_ADMINS: ${{ vars.DEV_EKS_ADMIN_PRINCIPAL_ARNS }}
+          QA_ADMINS: ${{ vars.QA_EKS_ADMIN_PRINCIPAL_ARNS }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [ "$ENVIRONMENT" = dev ]; then id="$DEV"; admins="$DEV_ADMINS"; else id="$QA"; admins="$QA_ADMINS"; fi
+          [ -n "$id" ] || { echo "No account configured for $ENVIRONMENT"; exit 1; }
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "admins=$admins" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.acct.outputs.id }}:role/gha-terraform-apply-${{ inputs.environment }}
+          role-session-name: gha-destroy-${{ inputs.environment }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - uses: ./.github/actions/terraform-init
+        with:
+          environment: ${{ inputs.environment }}
+          aws_account_id: ${{ steps.acct.outputs.id }}
+          aws_region: ${{ vars.AWS_REGION }}
+          eks_admin_principal_arns: ${{ steps.acct.outputs.admins }}
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform destroy
+        run: terraform destroy -auto-approve -lock-timeout=5m -no-color

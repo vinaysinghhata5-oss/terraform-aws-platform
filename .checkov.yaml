@@ -12,3 +12,4 @@ skip-check:
   - CKV_AWS_144  # S3 cross-region replication - DR for state handled by versioning + backups
   - CKV_AWS_18   # S3 server access logging - CloudTrail data events used instead
   - CKV2_AWS_62  # S3 event notifications - not required
+  - CKV_GHA_7    # SLSA build-input rule; bootstrap/destroy are manual ops workflows that need inputs (env + confirm)

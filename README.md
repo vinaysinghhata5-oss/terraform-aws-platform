@@ -179,6 +179,32 @@ nightly ─────────────► terraform-drift ─► opens 
    for readability; SHA-pinning protects against a compromised/re-tagged action
    (cf. the 2025 `tj-actions/changed-files` incident). Dependabot keeps the SHAs updated.
 
+## Run it from GitHub Actions
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `bootstrap` | manual, once per account | State bucket, KMS, OIDC roles, budget. Only workflow using static keys (`BOOTSTRAP_AWS_*` secrets) - delete them afterwards |
+| `terraform-ci` | pull request | fmt, validate, tflint, Checkov, plan for each configured env, plan as PR comment |
+| `terraform-deploy` | push to `main` / manual | dev → qa → prod; envs without an account variable are skipped |
+| `terraform-destroy` | manual (type env name to confirm) | Tear down dev/qa after practice |
+| `terraform-drift` | nightly | Opens an issue when AWS differs from code |
+
+Repository settings used (Settings → Secrets and variables → Actions):
+
+| Name | Kind | Example |
+|---|---|---|
+| `DEPLOY_ENABLED` | variable | `true` |
+| `AWS_REGION` | variable | `us-east-1` |
+| `DEV_AWS_ACCOUNT_ID` | variable | `123456789012` (same for `QA_`/`PROD_`) |
+| `DEV_EKS_ADMIN_PRINCIPAL_ARNS` | variable | `["arn:aws:iam::123456789012:user/dev"]` |
+| `TF_PLAN_ENCRYPTION_KEY` | secret | `openssl rand -base64 32` |
+| `BUDGET_EMAIL` | secret | used by `bootstrap` only |
+
+Run manually: **Actions → terraform-deploy → Run workflow**, or `gh workflow run terraform-deploy`.
+Tear down: **Actions → terraform-destroy → Run workflow** (environment `dev`, confirm `dev`).
+
+Locally instead: `AWS_PROFILE=dev ./scripts/dev-up.sh` and `./scripts/dev-down.sh`.
+
 ## Local usage
 
 ```bash
