@@ -28,7 +28,7 @@ eks_node_groups = {
   general = {
     instance_types = ["m7i-flex.large"] # free-tier eligible: 2 vCPU / 8 GiB
     min_size       = 1
-    max_size       = 2
+    max_size       = 3
     desired_size   = 1
     disk_size      = 30
   }
