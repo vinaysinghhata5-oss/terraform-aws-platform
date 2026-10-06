@@ -4,3 +4,7 @@ github_org      = "vinaysinghhata5-oss"
 github_repo     = "terraform-aws-platform"
 github_owner_id = "234816913" # immutable OIDC subject IDs
 github_repo_id  = "1406873367"
+
+# Human access (see bootstrap/people.tf)
+admin_users     = ["vinay"]
+developer_users = ["amar-dev"]

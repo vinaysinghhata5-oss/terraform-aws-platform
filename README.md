@@ -205,6 +205,12 @@ Tear down: **Actions → terraform-destroy → Run workflow** (environment `dev`
 
 Locally instead: `AWS_PROFILE=dev ./scripts/dev-up.sh` and `./scripts/dev-down.sh`.
 
+## Human access
+
+Admins and developers are IAM users with **no permissions of their own**; with MFA they assume
+`platform-admin` or `developer-readonly`, and reach the private EKS API through an SSM tunnel as
+themselves. See **[docs/HUMAN_ACCESS.md](docs/HUMAN_ACCESS.md)** for the model and onboarding steps.
+
 ## Local usage
 
 ```bash

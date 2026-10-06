@@ -39,3 +39,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "session_logging" {
+  description = "Record shell sessions to CloudWatch and manage Session Manager preferences (idle/max timeouts). One per account+region."
+  type        = bool
+  default     = true
+}
+
+variable "session_log_retention_days" {
+  description = "Retention for recorded sessions."
+  type        = number
+  default     = 90
+}

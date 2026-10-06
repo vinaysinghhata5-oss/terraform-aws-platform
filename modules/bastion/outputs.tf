@@ -12,3 +12,8 @@ output "security_group_id" {
   description = "Bastion security group ID."
   value       = aws_security_group.this.id
 }
+
+output "session_log_group" {
+  description = "CloudWatch log group with recorded bastion shell sessions."
+  value       = var.session_logging ? aws_cloudwatch_log_group.sessions[0].name : null
+}
