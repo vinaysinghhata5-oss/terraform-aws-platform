@@ -56,9 +56,12 @@ for i in $(seq 1 30); do
   echo "waiting for bastion to register with SSM ($i/30)..."; sleep 10
 done
 CMD_ID="$("$AWS" ssm send-command --instance-ids "$BASTION_ID" --document-name AWS-RunShellScript \
-  --parameters 'commands=["sudo -iu ec2-user bash -lc \"kubectl get nodes -o wide && kubectl get pods -A\""]' \
+  --parameters 'commands=["cloud-init status --wait >/dev/null || tail -n 30 /var/log/bastion-setup.log","sudo -iu ec2-user bash -lc \"kubectl get nodes -o wide && kubectl get pods -A\""]' \
   --query Command.CommandId --output text)"
-sleep 15
+for i in $(seq 1 40); do
+  STATUS="$("$AWS" ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$BASTION_ID" --query Status --output text 2>/dev/null || echo Pending)"
+  case "$STATUS" in Pending|InProgress|Delayed) sleep 15 ;; *) break ;; esac
+done
 "$AWS" ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$BASTION_ID" \
   --query '[Status,StandardOutputContent,StandardErrorContent]' --output text || true
 

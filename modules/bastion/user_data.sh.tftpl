@@ -1,16 +1,25 @@
 #!/bin/bash
 # Installs EKS tooling and pre-configures kubeconfig for anyone who logs in.
 set -euxo pipefail
+exec > >(tee -a /var/log/bastion-setup.log) 2>&1
+
+# Outbound internet is via the NAT gateway; on a fresh VPC it can lag behind
+# instance boot, so wait for it instead of failing the whole setup.
+for i in $(seq 1 60); do
+  curl -fsS --max-time 5 -o /dev/null https://dl.k8s.io && break
+  echo "waiting for outbound network ($i/60)"; sleep 10
+done
+CURL="curl -fsSL --retry 5 --retry-all-errors --retry-delay 5"
 
 # kubectl - latest patch of the cluster's minor version (client within +/-1 minor of server)
-KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable-${kubernetes_version}.txt")
-curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-curl -fsSLo /tmp/kubectl.sha256 "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+KUBECTL_VERSION=$($CURL "https://dl.k8s.io/release/stable-${kubernetes_version}.txt")
+$CURL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+$CURL -o /tmp/kubectl.sha256 "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
 echo "$(cat /tmp/kubectl.sha256)  /usr/local/bin/kubectl" | sha256sum --check
 chmod 0755 /usr/local/bin/kubectl
 
 # helm
-curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+$CURL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 dnf install -y git jq bash-completion
 
@@ -25,3 +34,5 @@ alias k=kubectl
 complete -o default -F __start_kubectl k
 PROFILE
 chmod 0644 /etc/profile.d/eks.sh
+
+echo "bastion setup complete: $(/usr/local/bin/kubectl version --client 2>&1 | head -1)"

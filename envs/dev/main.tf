@@ -82,6 +82,9 @@ module "bastion" {
   cluster_name       = local.name
   kubernetes_version = var.eks_version
   kms_key_arn        = module.kms.key_arn
+
+  # Wait for NAT routes: user data downloads kubectl/helm on first boot.
+  depends_on = [module.vpc]
 }
 
 # ================= Classic app tier (ALB -> EC2 ASG -> RDS) =================
