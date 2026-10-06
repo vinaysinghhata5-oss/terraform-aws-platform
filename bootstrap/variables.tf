@@ -47,3 +47,15 @@ variable "budget_limit_usd" {
   type        = number
   default     = 20
 }
+
+variable "github_owner_id" {
+  description = "Numeric GitHub owner ID. Set with github_repo_id when the repo uses immutable OIDC subjects (gh api repos/OWNER/REPO/actions/oidc/customization/sub)."
+  type        = string
+  default     = null
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub repository ID (see github_owner_id)."
+  type        = string
+  default     = null
+}

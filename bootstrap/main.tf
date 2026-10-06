@@ -1,5 +1,9 @@
 locals {
-  repo         = "${var.github_org}/${var.github_repo}"
+  # GitHub "immutable subject" format pins the numeric owner/repo IDs, so a deleted and
+  # re-created repo with the same name (repo-jacking) can't assume these roles.
+  repo = (var.github_owner_id != null && var.github_repo_id != null
+    ? "${var.github_org}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
+  : "${var.github_org}/${var.github_repo}")
   state_bucket = "${var.project}-tfstate-${var.aws_account_id}-${var.region}"
   oidc_url     = "token.actions.githubusercontent.com"
   plan_role    = "gha-terraform-plan-${var.environment}"
