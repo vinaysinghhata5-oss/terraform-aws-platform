@@ -25,18 +25,21 @@ runs:
         terraform_version: ${{ inputs.terraform_version }}
         terraform_wrapper: false
 
-    - name: Export account-specific variables
+    # *.auto.tfvars(.json) outrank terraform.tfvars; TF_VAR_* env vars do NOT
+    # (they have the lowest precedence), so the committed placeholders would win.
+    - name: Write account-specific variables
       shell: bash
+      working-directory: envs/${{ inputs.environment }}
       env:
         ACCOUNT_ID: ${{ inputs.aws_account_id }}
         REGION: ${{ inputs.aws_region }}
         ADMINS: ${{ inputs.eks_admin_principal_arns }}
       run: |
-        {
-          echo "TF_VAR_aws_account_id=$ACCOUNT_ID"
-          echo "TF_VAR_region=$REGION"
-          [ -n "$ADMINS" ] && echo "TF_VAR_eks_admin_principal_arns=$ADMINS"
-        } >> "$GITHUB_ENV"
+        jq -n --arg acct "$ACCOUNT_ID" --arg region "$REGION" --arg admins "$ADMINS" '
+          {aws_account_id: $acct, region: $region}
+          + (if $admins == "" then {} else {eks_admin_principal_arns: ($admins | fromjson)} end)
+        ' > ci.auto.tfvars.json
+        jq 'keys' ci.auto.tfvars.json
 
     - name: terraform init
       shell: bash
