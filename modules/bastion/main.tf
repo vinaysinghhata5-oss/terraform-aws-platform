@@ -123,7 +123,6 @@ resource "aws_instance" "this" {
 resource "aws_cloudwatch_log_group" "sessions" {
   count = var.session_logging ? 1 : 0
 
-  #checkov:skip=CKV_AWS_338:Retention is per-environment
   name              = "/aws/ssm/sessions/${var.name}"
   retention_in_days = var.session_log_retention_days
   kms_key_id        = var.kms_key_arn

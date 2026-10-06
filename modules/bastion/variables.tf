@@ -47,7 +47,12 @@ variable "session_logging" {
 }
 
 variable "session_log_retention_days" {
-  description = "Retention for recorded sessions."
+  description = "Retention for recorded sessions. They are audit evidence, so keep at least a year."
   type        = number
-  default     = 90
+  default     = 365
+
+  validation {
+    condition     = var.session_log_retention_days >= 365
+    error_message = "Session recordings are audit evidence: keep them at least 365 days."
+  }
 }
