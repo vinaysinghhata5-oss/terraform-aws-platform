@@ -22,7 +22,11 @@ vpc_interface_endpoints = [] # traffic goes via NAT; endpoints cost ~$7/month ea
 eks_version                = "1.35"
 eks_endpoint_public_access = false
 eks_support_type           = "STANDARD"
-eks_admin_principal_arns   = ["arn:aws:iam::111111111111:role/platform-admin"] # overridden in local.auto.tfvars
+eks_admin_principal_arns   = [] # extra ARNs (break-glass); set per account outside git
+
+# People: roles created by bootstrap/people.tf, assumed with MFA
+eks_admin_role_names    = ["platform-admin"]     # user vinay
+eks_readonly_role_names = ["developer-readonly"] # user amar-dev
 
 eks_node_groups = {
   general = {

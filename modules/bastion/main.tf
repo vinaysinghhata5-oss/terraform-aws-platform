@@ -107,10 +107,80 @@ resource "aws_instance" "this" {
     delete_on_termination = true
   }
 
-  tags = merge(var.tags, { Name = "${var.name}-bastion" })
+  # Role=bastion is what developer tunnel permissions are scoped to.
+  tags = merge(var.tags, { Name = "${var.name}-bastion", Role = "bastion" })
 
   lifecycle {
     # A new AL2023 AMI shouldn't silently replace the box; bump deliberately.
     ignore_changes = [ami]
   }
+}
+
+# ---------- Session recording ----------
+# Every interactive shell on the bastion is streamed to an encrypted log group.
+# (Port-forward tunnels carry TLS to the EKS API and are not recorded; the EKS audit
+# log records what was done, attributed to the person's own role.)
+resource "aws_cloudwatch_log_group" "sessions" {
+  count = var.session_logging ? 1 : 0
+
+  name              = "/aws/ssm/sessions/${var.name}"
+  retention_in_days = var.session_log_retention_days
+  kms_key_id        = var.kms_key_arn
+  tags              = var.tags
+}
+
+# Account/region-wide Session Manager preferences (one per account; one env per account).
+resource "aws_ssm_document" "session_preferences" {
+  count = var.session_logging ? 1 : 0
+
+  name            = "SSM-SessionManagerRunShell"
+  document_type   = "Session"
+  document_format = "JSON"
+  content = jsonencode({
+    schemaVersion = "1.0"
+    description   = "Session Manager preferences: recorded, time-limited sessions"
+    sessionType   = "Standard_Stream"
+    inputs = {
+      s3BucketName                = ""
+      s3KeyPrefix                 = ""
+      s3EncryptionEnabled         = true
+      cloudWatchLogGroupName      = aws_cloudwatch_log_group.sessions[0].name
+      cloudWatchEncryptionEnabled = true
+      cloudWatchStreamingEnabled  = true
+      kmsKeyId                    = var.kms_key_arn # session data KMS-encrypted on top of TLS
+      runAsEnabled                = false
+      runAsDefaultUser            = ""
+      idleSessionTimeout          = "20"
+      maxSessionDuration          = "60"
+      shellProfile                = { linux = "", windows = "" }
+    }
+  })
+  tags = var.tags
+}
+
+data "aws_iam_policy_document" "session_logs" {
+  count = var.session_logging ? 1 : 0
+
+  # Instance side of KMS-encrypted Session Manager data.
+  statement {
+    actions   = ["kms:Decrypt"]
+    resources = [var.kms_key_arn]
+  }
+
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+    resources = ["${aws_cloudwatch_log_group.sessions[0].arn}:*"]
+  }
+  statement {
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "session_logs" {
+  count = var.session_logging ? 1 : 0
+
+  name   = "session-logs"
+  role   = aws_iam_role.this.id
+  policy = data.aws_iam_policy_document.session_logs[0].json
 }

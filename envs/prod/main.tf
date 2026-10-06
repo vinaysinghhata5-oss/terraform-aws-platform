@@ -1,9 +1,16 @@
 locals {
   name = "${var.project}-${var.environment}"
 
-  # Bastion's role becomes an EKS admin alongside the human admins.
+  # People get EKS access through their roles (built from names, so no account IDs
+  # are committed). The bastion's own role is VIEW-ONLY: admins tunnel through it
+  # with their own identity, so the EKS audit log shows who did what.
   eks_admin_principal_arns = concat(
     var.eks_admin_principal_arns,
+    [for r in var.eks_admin_role_names : "arn:aws:iam::${var.aws_account_id}:role/${r}"],
+  )
+  eks_readonly_principal_arns = concat(
+    var.eks_readonly_principal_arns,
+    [for r in var.eks_readonly_role_names : "arn:aws:iam::${var.aws_account_id}:role/${r}"],
     var.enable_bastion ? [module.bastion[0].role_arn] : [],
   )
 }
@@ -66,7 +73,7 @@ module "eks" {
   deletion_protection                        = var.deletion_protection
   log_retention_days                         = var.log_retention_days
   admin_principal_arns                       = local.eks_admin_principal_arns
-  readonly_principal_arns                    = var.eks_readonly_principal_arns
+  readonly_principal_arns                    = local.eks_readonly_principal_arns
   node_groups                                = var.eks_node_groups
 }
 
@@ -82,6 +89,7 @@ module "bastion" {
   cluster_name       = local.name
   kubernetes_version = var.eks_version
   kms_key_arn        = module.kms.key_arn
+  session_logging    = var.bastion_session_logging
 
   # Wait for NAT routes: user data downloads kubectl/helm on first boot.
   depends_on = [module.vpc]

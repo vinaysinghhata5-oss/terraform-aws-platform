@@ -39,3 +39,20 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "session_logging" {
+  description = "Record shell sessions to CloudWatch and manage Session Manager preferences (idle/max timeouts). One per account+region."
+  type        = bool
+  default     = true
+}
+
+variable "session_log_retention_days" {
+  description = "Retention for recorded sessions. They are audit evidence, so keep at least a year."
+  type        = number
+  default     = 365
+
+  validation {
+    condition     = var.session_log_retention_days >= 365
+    error_message = "Session recordings are audit evidence: keep them at least 365 days."
+  }
+}

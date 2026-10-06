@@ -197,3 +197,21 @@ variable "bastion_instance_type" {
   type        = string
   default     = "t3.micro"
 }
+
+variable "eks_admin_role_names" {
+  description = "IAM role names (in this account) granted EKS cluster-admin, e.g. platform-admin."
+  type        = list(string)
+  default     = []
+}
+
+variable "eks_readonly_role_names" {
+  description = "IAM role names (in this account) granted EKS view-only, e.g. developer-readonly."
+  type        = list(string)
+  default     = []
+}
+
+variable "bastion_session_logging" {
+  description = "Record bastion shell sessions (manages the account's Session Manager preferences)."
+  type        = bool
+  default     = true
+}

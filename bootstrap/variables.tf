@@ -59,3 +59,15 @@ variable "github_repo_id" {
   type        = string
   default     = null
 }
+
+variable "admin_users" {
+  description = "IAM user names allowed to assume platform-admin (with MFA)."
+  type        = list(string)
+  default     = []
+}
+
+variable "developer_users" {
+  description = "IAM user names allowed to assume developer-readonly (with MFA)."
+  type        = list(string)
+  default     = []
+}

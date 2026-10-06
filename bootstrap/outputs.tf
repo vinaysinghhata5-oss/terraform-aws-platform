@@ -12,3 +12,13 @@ output "apply_role_arn" {
   description = "Role assumed by gated apply jobs."
   value       = aws_iam_role.apply.arn
 }
+
+output "platform_admin_role_arn" {
+  description = "Role admins assume (with MFA)."
+  value       = aws_iam_role.platform_admin.arn
+}
+
+output "developer_role_arn" {
+  description = "Role developers assume (with MFA)."
+  value       = aws_iam_role.developer.arn
+}
