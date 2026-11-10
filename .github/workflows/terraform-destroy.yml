@@ -41,7 +41,7 @@ jobs:
       run:
         working-directory: envs/${{ inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -59,7 +59,7 @@ jobs:
           echo "id=$id" >> "$GITHUB_OUTPUT"
           echo "admins=$admins" >> "$GITHUB_OUTPUT"
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ steps.acct.outputs.id }}:role/gha-terraform-apply-${{ inputs.environment }}
           role-session-name: gha-destroy-${{ inputs.environment }}-${{ github.run_id }}

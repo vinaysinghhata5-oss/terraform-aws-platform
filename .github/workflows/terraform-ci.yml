@@ -30,11 +30,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
@@ -51,7 +51,7 @@ jobs:
             echo "::endgroup::"
           done
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
 
       - name: tflint
         run: |
@@ -66,7 +66,7 @@ jobs:
       contents: read
       security-events: write # upload SARIF to the Security tab
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
           category: checkov
@@ -114,11 +114,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ vars[matrix.account_var] }}:role/gha-terraform-plan-${{ matrix.environment }}
           role-session-name: gha-plan-${{ matrix.environment }}-${{ github.run_id }}
@@ -153,7 +153,7 @@ jobs:
           cat summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment plan on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ENVIRONMENT: ${{ matrix.environment }}
         with:
