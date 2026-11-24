@@ -49,11 +49,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/gha-terraform-plan-${{ inputs.environment }}
           role-session-name: gha-plan-${{ inputs.environment }}-${{ github.run_id }}
@@ -97,7 +97,7 @@ jobs:
           PLAN_KEY: ${{ secrets.TF_PLAN_ENCRYPTION_KEY }}
         run: openssl enc -aes-256-cbc -pbkdf2 -salt -in tfplan -out tfplan.enc -pass env:PLAN_KEY
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.plan.outputs.has_changes == 'true'
         with:
           name: tfplan-${{ inputs.environment }}-${{ github.run_id }}
@@ -128,11 +128,11 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/gha-terraform-apply-${{ inputs.environment }}
           role-session-name: gha-apply-${{ inputs.environment }}-${{ github.run_id }}
@@ -147,7 +147,7 @@ jobs:
           eks_admin_principal_arns: ${{ inputs.eks_admin_principal_arns }}
           terraform_version: ${{ env.TF_VERSION }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: tfplan-${{ inputs.environment }}-${{ github.run_id }}
           path: envs/${{ inputs.environment }}
